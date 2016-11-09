@@ -199,16 +199,16 @@ void login(int argc, char  myarg[10][20], char user_psswd_buf[2][20])
 
 
 // 用户上传
-void upload(char user_psswd_buf[2][20], char myarg[10][20], int num)
+void upload(char user_psswd_buf[2][20], char myarg_up[10][20], int num_up)
 {
 
 
-	int sockfd = socket_create(myarg);
+	int sockfd = socket_create(myarg_up);
 
 	verify_user(user_psswd_buf, sockfd, 4);
 
 
-	//验证完后，开始上传文件
+/*	//验证完后，开始上传文件
 	int num_up;
 	char myarg_up[10][20];
 	char buf_up[100] ={0};
@@ -219,7 +219,7 @@ void upload(char user_psswd_buf[2][20], char myarg[10][20], int num)
 
 	//分解用户命令
 	split_user_cmd(myarg_up, buf_up, &num_up);
-
+*/
 
 	//////////////////////////////////////
 	struct stat sb;
@@ -277,6 +277,7 @@ void upload(char user_psswd_buf[2][20], char myarg[10][20], int num)
 
 
 	close(sockfd);
+	close(rdfd);
 }
 
 
@@ -300,43 +301,49 @@ void download(char user_psswd_buf[2][20], char myarg[10][20], int num)
 
 	int wrfd = open(myarg[1], O_RDWR | O_CREAT | O_TRUNC);
 	ret = recv(sockfd, buf, 107, MSG_WAITALL);
+	//int msglen = buf[1] * 256 + buf[2];
+	//int dataname_len = msglen -4;
+	int filesize = (buf[3]<<24) + (buf[4]<<16) + (buf[5]<<8) +(buf[6]<<0);
 
-	if (107 == ret)
+
+	if (107 == ret && 3 == buf[0]) //开始下载
 	{
-		
-		write();
+		while(filesize)
+		{
+			ret = recv(sockfd, buf, 3, MSG_WAITALL);//接受3头字节
+			if (3 != ret || 6 != buf[0])
+			{
+				syserr("wrong num");
+			}
+			char databuf[MAX_LEN] = {0};
+			int datalen = buf[1] * 256 + buf[2];
+			ret = recv(sockfd, buf, datalen, MSG_WAITALL);
+			write(wrfd, databuf, ret);
+
+			filesize -= ret;
+		}
 	}
 
-	if ( (ret = ack(buf[3])) && (3 == buf[0]) )
-	{
-		int msglen = buf[1] * 256 + buf[2];
-		int dataname_len = msglen -4;
-		int datalen = (buf[3]<<24) + (buf[4]<<16) + (buf[5]<<8) +(buf[6]<<0);
-
-
-	}
-
-
-
-
-	int src_filename_len = 50;
-	int dest_filename_len = strlen(myarg_up[2]);
-	int len = 4 + src_filename_len + dest_filename_len;
-
-	char buf[100] = {0x02};
-	buf[1] = len / 256;
-	buf[2] = len % 256;
-
-	strncpy(buf+3,(int)sb.st_size,4);
-	strncpy(buf+3+4,myarg_up[1],src_filename_len);
-	strncpy(buf+3+4+src_filename_len,myarg_up[2],dest_filename_len);
-
-	int ret = send(sockfd, buf, len + 3, 0);
-	ret = recv(sockfd, buf, 4, MSG_WAITALL);
-
-	ret = ack(buf[3]);
+	close(sockfd);
+	close(wrfd);
 }
 
+void select(char user_psswd_buf[2][20],char cmdline[10][20], int num)
+{
+	if (!strcmp(cmdline[0],"download"))
+	{
+		download(user_psswd_buf,cmdline,num);
+	}
+	else if(!strcmp(cmdline[0],"upload"))
+	{
+		upload(user_psswd_buf,cmdline,num);
+	}
+	else
+	{
+		printf("error\n");
+	}
+
+}
 
 //if(strcmp(myarg_up[0],"upload"));
 

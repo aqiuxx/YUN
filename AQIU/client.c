@@ -22,26 +22,22 @@ int main(int argc, char  *argv[])
 	while(1)
 	{
 		//用户输入 命令
+		//upload  download ls
 		printf("myyun> ");fflush(stdout);
 		gets(buf);
 
 		//分解用户命令
 		split_user_cmd(myarg, buf, &num);
 
+		select(user_psswd_buf,myarg, num);
+
 		//add task, 有线程池
 
-		pool_add_task(mypool, serv_routine, (void *)sockfd);
+		//pool_add_task(mypool, serv_routine, (void *)sockfd);
 	}
 
 }
 
 
-
-
-		printf("mydatabase> ");fflush(stdout);
-		gets(buf);
-		int ret = write(sockfd, buf, sizeof buf);
-		ret = read(sockfd, buf, sizeof buf);
-		printf("%s\n", buf);
 
 
