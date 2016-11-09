@@ -1,10 +1,12 @@
 #include "taskqueue.h"
+#include <pthread.h>
+
 typedef struct {
 	int pthread_num;
 	TASK_QUEUE *queue;
 	pthread_mutex_t flaglock;
 	pthread_cond_t mycond;
-	int destoryflag;	
+	int destoryflag;
 	pthread_t *mypth;
 }THDPL;
 

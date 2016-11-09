@@ -17,7 +17,7 @@ static void *mycall(void *arg)
 		pthread_mutex_lock(&(pool->flaglock));
 		while(NULL == (temp = taskqueue_out(pool->queue)))
 		{
-			printf("I'm ready to get task:%lu\n",pthread_self()/1024/1024/8-360);
+			//printf("I'm ready to get task:%lu\n",pthread_self()/1024/1024/8-360);
 			if(0 == pool->destoryflag)
 			{
 				printf("flag is on, ready to return \n");
@@ -29,8 +29,8 @@ static void *mycall(void *arg)
 		pthread_mutex_unlock(&(pool->flaglock));
 		if(temp)
 		{
-			printf("ready to do work:%lu\n", pthread_self()/1024/1024/8-360/*(unsigned int)(&temp)/8/1024/1024-330*/);
-			temp->call(temp->arg);		
+			//printf("ready to do work:%lu\n", pthread_self()/1024/1024/8-360/*(unsigned int)(&temp)/8/1024/1024-330*/);
+			temp->call(temp->arg);
 		}
 	}
 }
@@ -38,7 +38,7 @@ static void *mycall(void *arg)
 
 
 THDPL *creat_pool(int num)
-{	
+{
 	THDPL *newpool = (THDPL *)malloc(sizeof(THDPL));
 	newpool->pthread_num = num;	
 	newpool->queue  = taskqueue_creat();
@@ -48,7 +48,7 @@ THDPL *creat_pool(int num)
 	newpool->mypth = (pthread_t *)malloc(sizeof(pthread_t *) * num);
 	while(num--)
 		pthread_create(&(newpool->mypth[num]),NULL, mycall,(void *)newpool);	
-	return newpool;	
+	return newpool;
 }
 
 
@@ -63,6 +63,7 @@ int pool_add_task(THDPL *pool, p call, void *arg)
 	return 0;
 }
 
+
 int destory_pool(THDPL *pool)
 {
 	pool->destoryflag = 0;
@@ -70,7 +71,9 @@ int destory_pool(THDPL *pool)
 	while((pool->pthread_num)--)
 	{
 		pthread_join(pool->mypth[pool->pthread_num],NULL);
-		printf("%d:destory %lu\n",pool->pthread_num+1,pool->mypth[pool->pthread_num]/1024/1024/8-360);
+		//printf("%d:destory %lu\n",pool->pthread_num+1,pool->mypth[pool->pthread_num]/1024/1024/8-360);
 	}
 	printf("thread pool is destoryed\n");
 }
+
+

@@ -12,7 +12,7 @@ typedef struct tnode{
 }TASKNODE;
 
 typedef struct queue {
-	TASKNODE *front,*rear;	
+	TASKNODE *front,*rear;
 }TASK_QUEUE;
 
 TASK_QUEUE *taskqueue_creat();
