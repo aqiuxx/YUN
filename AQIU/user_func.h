@@ -23,7 +23,7 @@ void download(char user_psswd_buf[2][20], char myarg[10][20],int num);
 
 
 // 用户下载数据
-void select(char user_psswd_buf[2][20],char cmdline[10][20], int num);
+void choose(char user_psswd_buf[2][20],char cmdline[10][20], int num);
 
 // 用户输入命令处理
 void dealcommand(char user_psswd_buf[2][20]);

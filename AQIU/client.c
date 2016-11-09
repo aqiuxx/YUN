@@ -29,7 +29,7 @@ int main(int argc, char  *argv[])
 		//分解用户命令
 		split_user_cmd(myarg, buf, &num);
 
-		select(user_psswd_buf,myarg, num);
+		choose(user_psswd_buf,myarg, num);
 
 		//add task, 有线程池
 

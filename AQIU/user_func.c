@@ -328,7 +328,7 @@ void download(char user_psswd_buf[2][20], char myarg[10][20], int num)
 	close(wrfd);
 }
 
-void select(char user_psswd_buf[2][20],char cmdline[10][20], int num)
+void choose(char user_psswd_buf[2][20],char cmdline[10][20], int num)
 {
 	if (!strcmp(cmdline[0],"download"))
 	{
