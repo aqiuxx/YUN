@@ -8,9 +8,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 
 #include "ddebug.h"
+
+#define MAX_LEN 1024
 
 static int ack(int flag)
 {
@@ -205,7 +208,6 @@ void upload(char user_psswd_buf[2][20], char myarg[10][20], int num)
 	verify_user(user_psswd_buf, sockfd, 4);
 
 
-
 	//验证完后，开始上传文件
 	int num_up;
 	char myarg_up[10][20];
@@ -228,27 +230,49 @@ void upload(char user_psswd_buf[2][20], char myarg[10][20], int num)
 	   exit(EXIT_FAILURE);
 	}
 
+	int filesize = (int)(sb.st_size);
 
 	int src_filename_len = 50;
-	int dest_filename_len = strlen(myarg_up[2]);
-	int len = 4 + src_filename_len + dest_filename_len;
+	int dest_filename_len = 50;
+	//int dest_filename_len = strlen(myarg_up[2]);
+	//int len = 4 + src_filename_len + dest_filename_len;
+	int len = 104;
 
-	char buf[100] = {0x02};
-	buf[1] = len / 256;
-	buf[2] = len % 256;
+	char buf[107] = {0x02};
+	//buf[1] = len / 256;
+	//buf[2] = len % 256;
 
-	strncpy(buf+3,(int)(sb.st_size),4);//文件大小
+	buf[3] = filesize>>24;
+	buf[4] = filesize>>16;
+	buf[5] = filesize>>8;
+	buf[6] = filesize>>0;
+	//strncpy(buf+3, filesize ,4);//文件大小
 	strncpy(buf+3+4,myarg_up[1],src_filename_len);//原文件名字
 	strncpy(buf+3+4+src_filename_len,myarg_up[2],dest_filename_len);//目标路径
 
 	int ret = send(sockfd, buf, len + 3, 0);
 
+	//////读文件写数据
+	int rdfd = open(myarg_up[1], O_RDONLY);
+
+	while(filesize)
+	{
+		char file_buf[MAX_LEN] = {0x06};
+
+		ret = read(rdfd, file_buf+3, MAX_LEN - 3);
+
+		file_buf[1] = ret / 256;
+		file_buf[2] = ret % 256;
+
+		filesize -= ret;
+		ret = send(sockfd, file_buf, ret+3, 0);
+	}
 	//////////////////////////////////////
 
 
 	ret = recv(sockfd, buf, 4, MSG_WAITALL);
 
-	ret = ack(buf[3]);
+	ret = ack(buf[3]);//看是否成功
 
 
 
@@ -269,19 +293,27 @@ void download(char user_psswd_buf[2][20], char myarg[10][20], int num)
 	//请求并等待服务器响应，然后下载数据
 
 	//请求下载数据
-	char buf[100] = {0x03,  0x00,0x32};
+	char buf[107] = {0x03,  0x00,0x32};
 	strncpy(buf+7,myarg[1],50);
-	int ret = send(sockfd, buf, 57);
+	int ret = send(sockfd, buf, 107, 0);
 
-	ret = recv(sockfd, buf, 100, MSG_WAITALL);
 
-	if ( (ret = ack(buf[3])) && (2 == buf[0]) )
+	int wrfd = open(myarg[1], O_RDWR | O_CREAT | O_TRUNC);
+	ret = recv(sockfd, buf, 107, MSG_WAITALL);
+
+	if (107 == ret)
+	{
+		
+		write();
+	}
+
+	if ( (ret = ack(buf[3])) && (3 == buf[0]) )
 	{
 		int msglen = buf[1] * 256 + buf[2];
 		int dataname_len = msglen -4;
 		int datalen = (buf[3]<<24) + (buf[4]<<16) + (buf[5]<<8) +(buf[6]<<0);
-		
-		
+
+
 	}
 
 
