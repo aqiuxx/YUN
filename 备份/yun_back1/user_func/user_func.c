@@ -10,8 +10,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-
+#include "user_func.h"
 #include "ddebug.h"
+#include "pthreadpool.h"
 
 #define MAX_LEN 1024
 
@@ -142,15 +143,14 @@ int socket_create(char *myarg[])
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(-1 == sockfd)
 		syserr("sockfd");
-	if(myarg != NULL)
-	{
-		static	struct sockaddr_in serveraddr = {0};
-		serveraddr.sin_family = AF_INET;
-		serveraddr.sin_port = htons(atoi(myarg[2]));
-		serveraddr.sin_addr.s_addr = inet_addr(myarg[1]);//IPv4
-		static int len = sizeof serveraddr;	
-	}
-
+	if(myarg == NULL)
+		goto next;
+	static	struct sockaddr_in serveraddr = {0};
+	serveraddr.sin_family = AF_INET;
+	serveraddr.sin_port = htons(atoi(myarg[2]));
+	serveraddr.sin_addr.s_addr = inet_addr(myarg[1]);//IPv4
+	static int len = sizeof serveraddr;
+next:
 	if(-1 == connect(sockfd, (struct sockaddr*)&serveraddr, len))
 		syserr("connect");
 
@@ -248,8 +248,8 @@ void upload(char user_psswd_buf[2][20], char *myarg_up[], int num_up)
 	int filesize = (int)(sb.st_size);
 
 	printf("in the upload two\n");
-	
-	
+
+
 	int src_filename_len = 50;
 	int dest_filename_len = 50;
 	//int dest_filename_len = strlen(myarg_up[2]);
@@ -269,13 +269,14 @@ void upload(char user_psswd_buf[2][20], char *myarg_up[], int num_up)
 	strncpy(buf+3+4+src_filename_len,myarg_up[2],dest_filename_len);//目标路径
 
 	printf("in the upload three\n");
-	
-	
-	int ret = send(sockfd, buf, len + 3, 0);
+
+
+	int ret = send(sockfd, buf, len + 3, 0);//check ret ?
 
 
 	//////读文件写数据
 	int rdfd = open(myarg_up[1], O_RDONLY);
+	int send_data_num = 0; /******/
 
 	while(filesize)
 	{
@@ -286,9 +287,12 @@ void upload(char user_psswd_buf[2][20], char *myarg_up[], int num_up)
 		file_buf[1] = ret / 256;
 		file_buf[2] = ret % 256;
 
-		filesize -= ret;
 		printf("remand:%d\n",filesize);
 		ret = send(sockfd, file_buf, ret+3, 0);
+
+		filesize -= ret;
+		printf("send: %d%%\n", (int)(send_data_num/filesize) );
+		send_data_num += ret;
 	}
 	//////////////////////////////////////
 
@@ -311,57 +315,52 @@ void download(char user_psswd_buf[2][20], char *myarg[], int num)
 
 
 	int sockfd = socket_create(NULL);
-	printf("read to download\n");
+
 	verify_user(user_psswd_buf, sockfd,7, 4);
 
 	//请求并等待服务器响应，然后下载数据
 
-
 	//请求下载数据
-	unsigned char buf[107] = {0x03,  0x00,0x68};
+	char buf[107] = {0x03,  0x00,0x32};
 	strncpy(buf+7,myarg[1],50);
 	int ret = send(sockfd, buf, 107, 0);
 
-	printf("read to create %s\n",myarg[1]);
 
-	int wrfd = open(myarg[1], O_RDWR | O_CREAT | O_TRUNC,0666);
+	int wrfd = open(myarg[1], O_RDWR | O_CREAT | O_TRUNC);
 	ret = recv(sockfd, buf, 107, MSG_WAITALL);
 	//int msglen = buf[1] * 256 + buf[2];
 	//int dataname_len = msglen -4;
 	int filesize = (buf[3]<<24) + (buf[4]<<16) + (buf[5]<<8) +(buf[6]<<0);
 
-	
-	printf("get the filesize:%d\n", filesize);
 
-//	if (107 == ret && 3 == buf[0]) //开始下载
-//	{
-		int send_data_num = 0; /******/
-		while(filesize)
+	if (107 != ret || 3 != buf[0]) //开始下载
+	{
+		syserr("wrong num");
+	}
+
+	int send_data_num = 0; /******/
+	while(filesize)
+	{
+		char databuf[MAX_LEN] = {0};
+		ret = recv(sockfd, databuf, 3, MSG_WAITALL);//接受3头字节
+		if (3 != ret || 6 != databuf[0])
 		{
-			ret = recv(sockfd, buf, 3, MSG_WAITALL);//接受3头字节
-			printf("recv:%d\n",ret);
-			if (3 != ret || 6 != buf[0])
-			{
-				syserr("wrong num");
-			}
-			char databuf[MAX_LEN] = {0};
-			int datalen = buf[1] * 256 + buf[2];
-			ret = recv(sockfd, databuf, datalen, MSG_WAITALL);
-			printf("recv:%d\n",ret);
-			write(wrfd, databuf, ret);
-
-			filesize -= ret;
-
-			printf("send: %d%%\n", (int)(send_data_num/filesize) );/******/
-			send_data_num += ret;/******/
+			syserr("wrong num");
 		}
-//	}
+
+		int datalen = databuf[1] * 256 + databuf[2];
+		ret = recv(sockfd, databuf, datalen, MSG_WAITALL);
+		write(wrfd, databuf, ret);
+
+		filesize -= ret;
+
+		printf("send: %d%%\n", (int)(send_data_num/filesize) );
+		send_data_num += ret;
+	}
 
 	close(sockfd);
 	close(wrfd);
 }
-
-
 
 void dealcommand(char user_psswd_buf[2][20],char *cmdline[])
 {
@@ -376,27 +375,25 @@ void dealcommand(char user_psswd_buf[2][20],char *cmdline[])
 	char buf[100] = {0x05};
 	buf[1] = len / 256;
 	buf[2] = len % 256;
-	buf[3] = (!strcmp(cmdline[0],"ls"))?  1 :( (!strcmp(cmdline[0],"cd"))? 2 : 3 );
-	strncpy(buf+4, cmdline[1], len);
-	int ret = send(sockfd, buf, len+1, 0);
+	strncpy(buf+3, cmdline[1], len);
+	int ret = send(sockfd, buf, len, 0);
 
-	//接收总体长度
-	unsigned char databuf[MAX_LEN] = {0};
+	char databuf[MAX_LEN] = {0};
 	ret = recv(sockfd, databuf, 3, MSG_WAITALL);//接受3头字节
-	if (3 != ret || 8 != databuf[0])//8代表只接受空消息头信息
+	if (3 != ret || 5 != databuf[0])//也是返回 5 ？
 	{
 		syserr("cmdline - wrong num ");
 	}
 
 
-/*	if (!strcmp(cmdline[0], "ls"))
-	{*/
+	if (!strcmp(cmdline[0], "ls"))
+	{
 
 		//此处需要知道客户端那边协议是传几个字节的长度信息filesize
 		int filesize = databuf[1] * 256 + databuf[2];
 		while(filesize)
 		{
-			//接收单次的长度
+			//char databuf[MAX_LEN] = {0};
 			ret = recv(sockfd, databuf, 3, MSG_WAITALL);//接受3头字节
 			if (3 != ret || 6 != databuf[0])
 			{
@@ -410,68 +407,67 @@ void dealcommand(char user_psswd_buf[2][20],char *cmdline[])
 
 			filesize -= ret;
 
-			printf("%s", databuf);  //  此处可能需循环显示 ？？？？？
+			printf("%s\n", databuf);  //  此处可能需循环显示 ？？？？？
 		}
-		putchar('\n');
+		//传完之后再穿一次，表明一下状态
+		ret = recv(sockfd, databuf, 4, MSG_WAITALL);//接受3头字节
+		ret = ack(buf[3]);
 
-#if 0
 	}
 	else if (!strcmp(cmdline[0], "cd"))
 	{
-		recv(sockfd, databuf, 4, MSG_WAITALL);//接受3头字节
-		//ret = ack(buf[3]);
+		int ret = recv(sockfd, databuf, 4, MSG_WAITALL);//接受3头字节
+		ret = ack(buf[3]);
 	}
 	else//( !strcmp(cmdline[0], "mkdir") )
 	{
 		int ret = recv(sockfd, databuf, 4, MSG_WAITALL);//接受3头字节
 		ret = ack(buf[3]);
 	}
-#endif
+
 }
 
+
+//void choose(char user_psswd_buf[2][20],char *cmdline[], int num, THDPL *mypool)
 void choose(char user_psswd_buf[2][20],char *cmdline[], int num)
 {
-	//int sockfd = socket_create(NULL);
-	//	THDPL *mypool = creat_pool(10);
 	if (!strcmp(cmdline[0],"download"))
 	{
-#if 0
-		if (num > 3)
+/*		if (num > 3)
 		{
+			int sockfd = socket_create(NULL);
 			num = num - 2;
-			//int sockfd = socket_create(NULL);
+
 			while (num --)//线判断还是？？？？
 			{
 				pool_add_task(mypool, download, (void *)sockfd);
 			}
 		}*/
-#endif
-		download(user_psswd_buf , cmdline, num);
+
+		download(user_psswd_buf,  cmdline,  num);
 	}
 	else if(!strcmp(cmdline[0],"upload"))
 	{
-#if 0
-		if (num > 3)
+/*		if (num > 3)
 		{
-			//int sockfd = socket_create(NULL);
+			int sockfd = socket_create(NULL);
 			num = num - 2;
 
 			while (num --)//线判断还是？？？？
 			{
 				pool_add_task(mypool, upload, (void *)sockfd);
 			}
-		}
-#endif
-		upload(user_psswd_buf,cmdline,num);
+		}*/
+
+		upload(user_psswd_buf,  cmdline,  num);
 	}
 	else if(!strcmp(cmdline[0],"ls") | !strcmp(cmdline[0],"cd") | !strcmp(cmdline[0],"mkdir"))
 	{
-		//int sockfd = socket_create(NULL);
 		dealcommand(user_psswd_buf, cmdline);
 	}
 	else
 	{
-		printf("error\n");
+		printf("error cmdline\n");
 	}
 
 }

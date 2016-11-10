@@ -57,7 +57,6 @@ void routine(void *arg)
 				return ;
 			}
 			//send ack;
-			printf("verify ok,reply!\n");
 			sendack(socket, VEROK);
 //			send(socket, wbuf, 4);
 			//get requirement
@@ -69,14 +68,13 @@ void routine(void *arg)
 			{
 				char wbuf[1024] ={0};
 				char filename[50]={0};
-				printf("read to recevi download\n");
+
 				recv(socket, rbuf, 104, MSG_WAITALL);
 				//send filename and size
 				strncpy(filename,rbuf + 4,50);
 				struct stat buf;
 				stat(filename,&buf);
 				
-				printf("read to downloadfile%s\n",filename);
 				filelen = buf.st_size;
 
 				wbuf[0] = 2;
@@ -115,7 +113,7 @@ void routine(void *arg)
 			//upload
 			else if(2 == rbuf[0])
 			{
-				unsigned char wbuf[1024] ={0};
+				char wbuf[1024] ={0};
 				char filename[100]={0};
 				int buflen;
 				recv(socket, rbuf, 104,MSG_WAITALL);
@@ -132,7 +130,6 @@ void routine(void *arg)
 
 				filelen = (rbuf[0]<<24)+(rbuf[1]<<16)+(rbuf[2]<<8)+rbuf[3];
 
-				printf("get filelen %d\n",filelen);
 				//create file,if file exist,return 
 				int filefd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0666);
 				printf("read to open file %s\n",filename);

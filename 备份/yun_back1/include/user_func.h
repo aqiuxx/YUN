@@ -28,5 +28,4 @@ void choose(char user_psswd_buf[2][20],char cmdline[10][20], int num);
 // 用户输入命令处理
 void dealcommand(char user_psswd_buf[2][20],char cmdline[10][20]);
 
-
 #endif
